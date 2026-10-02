@@ -17,8 +17,14 @@ const list = (value) =>
 
 const stripSlash = (url) => (url || '').trim().replace(/\/+$/, '');
 
-const miniappUrl = stripSlash(process.env.MINIAPP_URL);
 const env = (name) => (process.env[name] || '').trim();
+
+// Mini App manzili. Yozilmagan bo'lsa, hosting bergan ochiq manzil olinadi (Render, Railway).
+const miniappUrl = stripSlash(
+  env('MINIAPP_URL') ||
+    env('RENDER_EXTERNAL_URL') ||
+    (env('RAILWAY_PUBLIC_DOMAIN') ? `https://${env('RAILWAY_PUBLIC_DOMAIN')}` : ''),
+);
 
 const payme = {
   merchantId: env('PAYME_MERCHANT_ID'),

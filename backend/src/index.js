@@ -139,7 +139,9 @@ async function main() {
   if (!config.adminTelegramIds.length) {
     console.warn('⚠️  ADMIN_TELEGRAM_IDS bo‘sh: buyurtmalar haqida Telegram xabari adminga bormaydi (Admin Panel ishlayveradi).');
   }
-  if (!config.miniappUrl) {
+  if (config.miniappUrl) {
+    console.log(`📱 Mini App manzili: ${config.miniappUrl}`);
+  } else {
     console.warn('⚠️  MINIAPP_URL bo‘sh: Mini App manzilini (server domeni yoki ngrok) .env ga yozing, shunda bot Mini App tugmasini ko‘rsatadi.');
   }
 

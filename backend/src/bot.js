@@ -156,11 +156,12 @@ export async function startBot() {
       { command: 'id', description: 'Telegram ID raqamim' },
     ]);
 
-    if (isHttps(config.miniappUrl)) {
-      await bot.telegram.setChatMenuButton({
-        menuButton: { type: 'web_app', text: 'Buyurtma', web_app: { url: config.miniappUrl } },
-      });
-    }
+    // Manzil bo'lmasa, menyu tugmasini oddiy holatga qaytaramiz - eski (o'chgan) manzil qolib ketmasin
+    await bot.telegram.setChatMenuButton({
+      menuButton: isHttps(config.miniappUrl)
+        ? { type: 'web_app', text: 'Buyurtma', web_app: { url: config.miniappUrl } }
+        : { type: 'default' },
+    });
 
     // launch() bot to'xtaguncha tugamaydi, shuning uchun kutmaymiz
     launch(true);
