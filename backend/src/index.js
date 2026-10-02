@@ -9,11 +9,12 @@ import { ZodError } from 'zod';
 import { config } from './config.js';
 import { prisma } from './prisma.js';
 import { HttpError } from './lib/format.js';
-import { startBot, stopBot } from './bot.js';
+import { startBot, stopBot, webhookHandler, webhookPath } from './bot.js';
 import { telegramAuth, userLimiter } from './middleware/telegramAuth.js';
 import appRoutes from './routes/app.js';
 import adminRoutes, { uploadsDir } from './routes/admin.js';
 import paymentRoutes from './routes/payments.js';
+import imageRoutes from './routes/images.js';
 import { paymentMode } from './lib/payments.js';
 
 const app = express();
@@ -44,6 +45,10 @@ const sameHost = (req, origin) => {
     return false;
   }
 };
+
+// Telegram bot webhook'i (hostingda). Telegram serveri chaqiradi: maxfiy manzil + maxfiy sarlavha bilan tekshiriladi.
+// CORS va umumiy so'rov chegarasidan oldin turadi.
+app.post(webhookPath, webhookHandler);
 
 // CORS: faqat o'zimizning Mini App va Admin Panel manzillari
 app.use(
@@ -78,6 +83,9 @@ app.use('/uploads', express.static(uploadsDir, { maxAge: '7d', index: false }));
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 
+// Mahsulot rasmlari (bazada base64). Ochiq: <img> teglari sarlavha yubora olmaydi.
+app.use('/api/images', imageRoutes);
+
 // Mini App API: har bir so'rov Telegram imzosi bilan tekshiriladi
 app.use('/api/app', telegramAuth, userLimiter, appRoutes);
 // Admin Panel API: parol + JWT
@@ -103,11 +111,13 @@ const servesMiniapp = serveSpa('/', path.join(rootDir, 'miniapp/dist'));
 
 // Xatoliklar
 app.use((err, req, res, next) => {
-  if (err instanceof HttpError) return res.status(err.status).json({ error: err.message });
+  if (err instanceof HttpError) {
+    return res.status(err.status).json({ error: err.message, ...(err.code ? { code: err.code } : {}) });
+  }
   if (err instanceof ZodError) {
     return res.status(400).json({ error: err.issues[0]?.message || "Ma'lumot noto'g'ri" });
   }
-  if (err.code === 'LIMIT_FILE_SIZE') return res.status(400).json({ error: "Rasm hajmi 3 MB dan oshmasin" });
+  if (err.code === 'LIMIT_FILE_SIZE') return res.status(400).json({ error: 'Rasm hajmi 2 MB dan oshmasin' });
   if (err.type === 'entity.too.large') return res.status(413).json({ error: "So'rov juda katta" });
   if (err.type === 'entity.parse.failed') return res.status(400).json({ error: "Noto'g'ri so'rov" });
   console.error(err);
@@ -147,6 +157,14 @@ async function main() {
 
   const MODE = { live: 'haqiqiy', test: 'SINOV (pul yechilmaydi)', null: "o'chirilgan" };
   console.log(`💳 Onlayn to'lov: Payme - ${MODE[paymentMode('PAYME')]}, Click - ${MODE[paymentMode('CLICK')]}`);
+  if (config.card.enabled) {
+    console.log(`💳 Karta orqali to'lov: ${config.card.number.slice(0, 4)} **** **** ${config.card.number.slice(-4)}`);
+    if (!config.adminTelegramIds.length) {
+      console.warn("⚠️  Karta to'lovlari faqat Admin Panelda ko'rinadi. Telegram'da tasdiqlash uchun ADMIN_TELEGRAM_IDS yozing.");
+    }
+  } else if (config.card.invalid) {
+    console.warn("⚠️  CARD_NUMBER noto'g'ri (16 raqam bo'lishi kerak): karta orqali to'lov o'chirildi.");
+  }
   if (config.paymentsTestMode) {
     console.warn("⚠️  PAYMENTS_TEST_MODE=true: kalitlari yozilmagan to'lov tizimi pulsiz tasdiqlanadi. Serverda buni o'chiring!");
   }

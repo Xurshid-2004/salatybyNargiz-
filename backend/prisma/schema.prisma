@@ -24,6 +24,7 @@ enum PaymentMethod {
   CASH
   CLICK
   PAYME
+  CARD // kartaga o'tkazma (P2P): mijoz chek yuklaydi, admin tasdiqlaydi
 }
 
 enum PaymentStatus {
@@ -51,19 +52,21 @@ enum ClickStatus {
 }
 
 model User {
-  id         Int             @id @default(autoincrement())
-  telegramId BigInt          @unique
-  firstName  String
-  lastName   String?
-  username   String?
-  phone      String?
-  language   String          @default("ru")
-  bonus      Int             @default(0)
-  addresses  Json            @default("[]")
-  createdAt  DateTime        @default(now())
-  updatedAt  DateTime        @updatedAt
-  orders     Order[]
-  intents    PaymentIntent[]
+  id              Int             @id @default(autoincrement())
+  telegramId      BigInt          @unique
+  firstName       String
+  lastName        String?
+  username        String?
+  phone           String? // E.164: +998901234567
+  // Raqam Telegram orqali tasdiqlangan vaqt. Bo'sh bo'lsa - mijoz hali ro'yxatdan o'tmagan.
+  phoneVerifiedAt DateTime?
+  language        String          @default("ru")
+  bonus           Int             @default(0)
+  addresses       Json            @default("[]")
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  orders          Order[]
+  intents         PaymentIntent[]
 }
 
 model Product {
@@ -72,6 +75,10 @@ model Product {
   description String   @default("")
   price       Int
   imageUrl    String   @default("")
+  // Yuklangan rasm bazada base64 ko'rinishida saqlanadi (serverda doimiy disk shart emas).
+  // Rasm /api/images/products/:id manzilidan beriladi, imageUrl shu manzilni ko'rsatadi.
+  imageData   String?
+  imageMime   String?
   category    Category
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
@@ -114,10 +121,16 @@ model PaymentIntent {
   orderId   Int?
   createdAt DateTime      @default(now())
 
+  // Karta orqali to'lov (CARD): mijoz yuklagan to'lov cheki (rasm, base64)
+  receiptData String?
+  receiptMime String?
+  receiptAt   DateTime?
+
   paymeTransactions PaymeTransaction[]
   clickTransactions ClickTransaction[]
 
   @@index([userId])
+  @@index([provider, status])
 }
 
 // Payme (Merchant API) tranzaksiyalari. Ularni Payme serveri boshqaradi.

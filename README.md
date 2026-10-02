@@ -59,16 +59,24 @@ npm start       # bazani yangilaydi (prisma migrate deploy) va serverni ishga tu
 2. https://railway.com da: New Project -> Deploy from GitHub repo -> repo'ni tanlang.
    Build va start buyruqlari `railway.json` dan o'qiladi.
 3. Service -> Settings -> Networking -> **Generate Domain**: `https://xxxx.up.railway.app` manzili beriladi.
-4. Service'ga **Volume** qo'shing, Mount path: `/data` (yuklangan rasmlar o'chib ketmasligi uchun).
-5. Service -> **Variables** ga `backend/.env` dagi qiymatlarni yozing, shu bilan birga:
+4. Service -> **Variables** ga `backend/.env` dagi qiymatlarni yozing, shu bilan birga:
    - `MINIAPP_URL` = 3-qadamdagi manzil (oxirida `/` bo'lmasin)
    - `TRUST_PROXY=1`
-   - `UPLOADS_DIR=/data/uploads`
    - `PAYMENTS_TEST_MODE=false`
    - `JWT_SECRET` = kamida 32 belgili yangi tasodifiy matn, `ADMIN_PASSWORD` = murakkab parol
    - Payme / Click kalitlari (pastdagi bo'lim). `PORT` ni yozmang, Railway o'zi beradi.
-6. Deploy tugagach, logda shular chiqishi kerak: `✅ Backend ishga tushdi`, `🌐 Mini App (/)...`, `🤖 Bot ishga tushdi`.
-7. Telegramda botga `/start` yozing. Admin Panel: `https://xxxx.up.railway.app/admin/`.
+5. Deploy tugagach, logda shular chiqishi kerak: `✅ Backend ishga tushdi`, `🌐 Mini App (/)...`, `🤖 Bot ishga tushdi`.
+6. Telegramda botga `/start` yozing. Admin Panel: `https://xxxx.up.railway.app/admin/`.
+
+### Render (bepul tarif)
+Bepul tarifda server 15 daqiqa so'rov bo'lmasa uxlaydi va disk doimiy emas. Loyiha bunga moslangan:
+- **Bot webhook rejimida ishlaydi** (Render'da o'zi yoqiladi). Telegram har bir xabarni serverga yuboradi va shu so'rov
+  uxlab yotgan serverni uyg'otadi: `/start`, raqam yuborish va admin tugmalari server uxlasa ham ishlaydi.
+  Uyg'onish 30-60 soniya oladi, xabar yo'qolmaydi (Telegram qayta yuboradi).
+- Rasmlar va cheklar bazada saqlanadi, disk kerak emas.
+- Tezroq javob uchun (ixtiyoriy): https://uptimerobot.com da har 5 daqiqada `https://DOMEN/api/health` ni tekshiradigan
+  monitor qo'shing, server uxlamaydi. Bitta xizmat uchun bepul soat (750 soat/oy) yetadi.
+- Logda `🤖 Bot webhook rejimida ishlaydi` chiqishi kerak.
 
 ### Boshqa server (VPS)
 Node.js 20+, `npm run build`, `npm start` (doimiy ishlashi uchun pm2 yoki systemd). Oldiga nginx + HTTPS
@@ -80,6 +88,57 @@ Node.js 20+, `npm run build`, `npm start` (doimiy ishlashi uchun pm2 yoki system
 - **Sinov va haqiqiy baza alohida bo'lsin.** Kompyuterda sinash uchun Neon'da alohida branch oching, aks holda
   sinov buyurtmalari haqiqiy bazaga tushadi.
 - Har deploy'da `prisma migrate deploy` o'zi ishlaydi: faqat yangi o'zgarishlar qo'shiladi, ma'lumotlar o'chmaydi.
+- GitHub'ga `git push` qilinsa, Render/Railway yangi versiyani o'zi yig'ib chiqaradi (Auto-Deploy yoqilgan bo'lsa).
+  Variables (muhit o'zgaruvchilari) har deploy'da saqlanib qoladi, ularni qayta yozish shart emas.
+
+## Ro'yxatdan o'tish (telefon raqam)
+
+Mini App birinchi ochilganda mijoz telefon raqamini tasdiqlaydi, shundan keyingina menyu ochiladi.
+SMS kerak emas: raqamni Telegram o'zi beradi va imzolaydi.
+
+1. Mijoz "Telefon raqamni yuborish" tugmasini bosadi, Telegram oynasida roziligini beradi.
+2. Mini App Telegram imzolagan javobni serverga yuboradi (`POST /api/app/auth/contact`). Server imzoni bot tokeni bilan
+   tekshiradi va raqam aynan shu mijozniki ekanini (user_id) solishtiradi. Raqam `+998901234567` ko'rinishida saqlanadi.
+3. Shu bilan birga raqam bot chatiga ham keladi va bot uni tasdiqlaydi. Shuning uchun imzo qaysidir ilovada kelmasa ham
+   ro'yxatdan o'tish ishlayveradi.
+4. Juda eski Telegram ilovalarida bot chatga "📱 Raqamni yuborish" tugmasini yuboradi.
+
+Himoya: raqamni mijoz qo'lda yoza olmaydi, boshqa odamning kontakti qabul qilinmaydi, buyurtma serverda ham faqat
+tasdiqlangan raqam bilan qabul qilinadi (`PHONE_REQUIRED`). Buyurtmadagi telefon - tasdiqlangan raqam.
+Oldin ro'yxatdan o'tgan mijozlar ham bir marta raqamini tasdiqlaydi.
+
+## Karta orqali to'lov (kartaga o'tkazma)
+
+Savatda "Naqd pul" bilan birga **"Karta orqali"** (oldindan to'lov) chiqadi. Pul to'g'ridan-to'g'ri do'kon kartasiga
+o'tadi (`9860 1201 2410 4734`, `CARD_NUMBER` bilan almashtiriladi).
+
+1. Mijoz "Karta orqali" ni tanlaydi. Buyurtma hali yaratilmaydi, to'lov "kutish" holatida turadi.
+2. Mini App karta raqami va aniq summani ko'rsatadi ("Nusxalash" tugmalari bilan). Mijoz o'z bank ilovasida
+   (Payme, Click, Uzum...) o'tkazadi va **chek skrinshotini yuklaydi**.
+3. Adminga chek boradi: Telegram'da (rasm + **✅ Pul tushdi / ❌ Pul tushmadi** tugmalari) va Admin Panelda
+   ("Karta to'lovlari" bo'limi, ovozli xabar bilan).
+4. Admin bank ilovasida kartaga aynan shu summa tushganini tekshirib tasdiqlaydi. Shundagina buyurtma
+   **"Karta - To'langan"** bo'lib yaratiladi, mijozga va adminlarga oddiy buyurtma xabari boradi.
+   Rad etilsa, mijozga "pul tushmadi" xabari boradi, buyurtma yaratilmaydi.
+
+Muhim:
+- Shaxsiy kartaga tushgan pulni hech bir dastur avtomatik tasdiqlay olmaydi (bankning ochiq API'si yo'q), shuning
+  uchun oxirgi qadamni admin qiladi. Mijoz to'lovni o'zi "to'landi" qila olmaydi, summa serverda hisoblanadi.
+- Telegram'da tasdiqlash uchun `ADMIN_TELEGRAM_IDS` yozilgan bo'lishi kerak (aks holda faqat Admin Panelda).
+- Mijozga chek yuklash uchun 24 soat beriladi. Cheklar 30 kundan keyin bazadan o'chiriladi (Telegram'da nusxasi qoladi).
+- Biznes tushumini shaxsiy kartaga ko'p qabul qilish bank cheklovlariga olib kelishi mumkin. To'liq avtomatik
+  to'lov uchun Payme/Click ulanishi tayyor (pastdagi bo'lim) - kalitlarni yozish kifoya.
+
+## Mahsulot rasmlari
+
+Admin Panelda yuklangan rasm diskka emas, bazaga **base64** ko'rinishida yoziladi, shuning uchun server qayta
+ishga tushganda yoki yangi deploy'da o'chib ketmaydi (Render bepul tarifida doimiy disk yo'q).
+
+- Yuborishdan oldin Admin Panel rasmni kichraytiradi (1280px, WEBP), odatda 100-300 KB bo'ladi. Chegara: 2 MB.
+- Fayl turi faylning o'z ichidan tekshiriladi: faqat JPG, PNG, WEBP.
+- Rasm `https://domen/api/images/products/<id>?v=...` manzilidan beriladi va brauzerda uzoq keshlanadi.
+- Oldin diskka yuklangan rasmlar (`/uploads/...`) serverda o'chib ketgan bo'lishi mumkin: o'sha mahsulotlarga rasmni
+  Admin Panel orqali qaytadan yuklang.
 
 ## Xavfsizlik
 
@@ -125,4 +184,5 @@ Qanday ishlaydi:
   adminga Telegram xabar boradi. Yetkazilgan buyurtma uchun to'lovni qaytarishga ruxsat berilmaydi.
 - `PAYMENTS_TEST_MODE=true` faqat kompyuterda sinash uchun: kalitlari yozilmagan tizimda pulsiz
   "To'lovni tasdiqlash" tugmasi chiqadi. Kalitlari yozilgan tizimga bu sozlama ta'sir qilmaydi.
-- Bazaga yangi jadvallar qo'shildi: yangilangandan keyin bir marta `npm run db:migrate` ni ishga tushiring.
+- Bazaga yangi jadvallar qo'shildi: yangilangandan keyin bir marta `npm run db:migrate` ni ishga tushiring
+  (serverda `npm start` buni o'zi qiladi).

@@ -4,8 +4,7 @@ import { api } from '../api';
 import { useApp } from '../store';
 import { TopBar, BackButton } from '../components/TopBar';
 import { ProductImage, Stepper } from '../components/ProductCard';
-
-const PHONE_RE = /^\+?[0-9\s\-()]{7,20}$/;
+import { formatPhone } from '../i18n';
 
 function getLocation() {
   return new Promise((resolve, reject) => {
@@ -22,7 +21,7 @@ export default function Cart() {
   const {
     t, user, config, cartItems, cartTotal, formatMoney, setQty, clearCart,
     orderType, setOrderType, addressId, setAddressId, branchId, setBranchId,
-    updateProfile, showToast, go, reset,
+    updateProfile, showToast, go, reset, load,
   } = useApp();
 
   const selected = user.addresses.find((a) => a.id === addressId);
@@ -30,7 +29,6 @@ export default function Cart() {
   const [coords, setCoords] = useState(
     selected?.latitude != null ? { lat: selected.latitude, lng: selected.longitude } : null,
   );
-  const [phone, setPhone] = useState(user.phone || '');
   const [method, setMethod] = useState('CASH');
   const [saveAddr, setSaveAddr] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -52,7 +50,6 @@ export default function Cart() {
   };
 
   const submit = async () => {
-    if (!PHONE_RE.test(phone.trim())) return showToast(t('fill_phone'));
     if (orderType === 'DELIVERY' && address.trim().length < 5) return showToast(t('fill_address'));
 
     setBusy(true);
@@ -64,19 +61,17 @@ export default function Cart() {
         latitude: coords?.lat ?? null,
         longitude: coords?.lng ?? null,
         branchId,
-        phone: phone.trim(),
         paymentMethod: method,
       });
 
       // Manzilni saqlash (xohlasa) - buyurtmaga xalaqit bermasligi uchun xatoliklar e'tiborsiz
-      const patch = { phone: phone.trim() };
       if (saveAddr && orderType === 'DELIVERY' && !user.addresses.some((a) => a.address === address.trim())) {
-        patch.addresses = [
+        const addresses = [
           ...user.addresses,
           { id: Date.now().toString(36), title: '', address: address.trim(), latitude: coords?.lat ?? null, longitude: coords?.lng ?? null },
         ].slice(-10);
+        updateProfile({ addresses }).catch(() => {});
       }
-      updateProfile(patch).catch(() => {});
 
       if (res.order) {
         clearCart();
@@ -86,6 +81,8 @@ export default function Cart() {
       }
     } catch (err) {
       showToast(err.message || t('error_generic'));
+      // Raqam tasdig'i bekor qilingan bo'lsa - profilni yangilaymiz, ilova ro'yxatdan o'tishga qaytadi
+      if (err.code === 'PHONE_REQUIRED') load();
     } finally {
       setBusy(false);
     }
@@ -179,17 +176,14 @@ export default function Cart() {
           </div>
         )}
 
-        <label className="field">
-          <span>{t('phone')}</span>
-          <input
-            type="tel"
-            inputMode="tel"
-            value={phone}
-            placeholder={t('phone_ph')}
-            maxLength={20}
-            onChange={(e) => setPhone(e.target.value)}
-          />
-        </label>
+        <div className="info-row">
+          <Icon name="phone" />
+          <span>
+            <small>{t('phone')}</small>
+            <strong>{formatPhone(user.phone)}</strong>
+          </span>
+          <span className="verified"><Icon name="check" size={14} /> {t('verified')}</span>
+        </div>
       </section>
 
       <section className="panel">
@@ -197,6 +191,7 @@ export default function Cart() {
         <div className="fields">
           {[
             ['CASH', t('pay_cash'), t('pay_cash_sub')],
+            ['CARD', t('pay_card'), t('pay_card_sub')],
             ['CLICK', t('pay_click'), t('pay_online_sub')],
             ['PAYME', t('pay_payme'), t('pay_online_sub')],
           ].filter(([code]) => config.paymentMethods.includes(code)).map(([code, title, sub]) => (

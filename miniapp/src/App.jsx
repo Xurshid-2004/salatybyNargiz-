@@ -1,6 +1,7 @@
 import { useApp } from './store';
 import { initData, tg } from './tg';
 import { ThemeToggle } from './components/TopBar';
+import Register from './screens/Register';
 import Welcome from './screens/Welcome';
 import Home from './screens/Home';
 import Cart from './screens/Cart';
@@ -21,6 +22,7 @@ const SCREENS = {
   addresses: Addresses,
 };
 
+/** @param {{ title: any, text?: any, action?: any }} props */
 function Message({ title, text, action }) {
   return (
     <div className="screen">
@@ -40,7 +42,7 @@ function Message({ title, text, action }) {
 }
 
 export default function App() {
-  const { t, loading, loadError, load, screen, toast } = useApp();
+  const { t, user, loading, loadError, load, screen, toast } = useApp();
 
   // Ilova Telegram tashqarisida ochilgan bo'lsa - so'rovlar baribir rad etiladi
   if (!initData) {
@@ -57,7 +59,8 @@ export default function App() {
     );
   }
 
-  const Screen = SCREENS[screen.name] || Home;
+  // Telefon raqam tasdiqlanmaguncha (ro'yxatdan o'tmaguncha) faqat ro'yxatdan o'tish ekrani
+  const Screen = user.phoneVerified ? SCREENS[screen.name] || Home : Register;
   return (
     <>
       <Screen />

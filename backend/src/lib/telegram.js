@@ -1,14 +1,16 @@
 import crypto from 'node:crypto';
 
-/**
- * Telegram Mini App initData imzosini tekshiradi (HMAC-SHA-256).
- * https://core.telegram.org/bots/webapps#validating-data-received-via-the-mini-app
- * Muvaffaqiyatli bo'lsa Telegram foydalanuvchisi obyektini, aks holda null qaytaradi.
- */
-export function validateInitData(initData, botToken, maxAgeSeconds = 24 * 60 * 60) {
-  if (typeof initData !== 'string' || !initData) return null;
+const DAY = 24 * 60 * 60;
 
-  const params = new URLSearchParams(initData);
+/**
+ * Telegram imzolagan ma'lumotni (initData, requestContact javobi) tekshiradi (HMAC-SHA-256).
+ * https://core.telegram.org/bots/webapps#validating-data-received-via-the-mini-app
+ * To'g'ri bo'lsa parametrlarni (URLSearchParams), aks holda null qaytaradi.
+ */
+function checkSigned(raw, botToken, maxAgeSeconds) {
+  if (typeof raw !== 'string' || !raw) return null;
+
+  const params = new URLSearchParams(raw);
   const hash = params.get('hash');
   if (!hash) return null;
   params.delete('hash');
@@ -28,11 +30,30 @@ export function validateInitData(initData, botToken, maxAgeSeconds = 24 * 60 * 6
 
   const authDate = Number(params.get('auth_date'));
   if (!authDate || Date.now() / 1000 - authDate > maxAgeSeconds) return null;
+  return params;
+}
 
+function parseJson(value) {
   try {
-    const user = JSON.parse(params.get('user') || '');
-    return user && typeof user.id === 'number' ? user : null;
+    return JSON.parse(value || '');
   } catch {
     return null;
   }
+}
+
+/** Mini App initData. Telegram foydalanuvchisi obyektini yoki null qaytaradi. */
+export function validateInitData(initData, botToken, maxAgeSeconds = DAY) {
+  const params = checkSigned(initData, botToken, maxAgeSeconds);
+  const user = params && parseJson(params.get('user'));
+  return user && typeof user.id === 'number' ? user : null;
+}
+
+/**
+ * Telegram.WebApp.requestContact() javobi. Raqamni Telegram o'zi imzolaydi, shuning uchun
+ * uni mijoz o'zgartira olmaydi. { phone_number, user_id, ... } yoki null qaytaradi.
+ */
+export function validateContact(response, botToken, maxAgeSeconds = DAY) {
+  const params = checkSigned(response, botToken, maxAgeSeconds);
+  const contact = params && parseJson(params.get('contact'));
+  return contact && typeof contact.user_id === 'number' && contact.phone_number ? contact : null;
 }

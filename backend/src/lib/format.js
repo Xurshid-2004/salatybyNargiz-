@@ -15,9 +15,11 @@ export function safeEqual(a, b) {
   return crypto.timingSafeEqual(sha(a), sha(b));
 }
 
+// code - Mini App xatoni matnsiz tanishi uchun (masalan PHONE_REQUIRED)
 export class HttpError extends Error {
-  constructor(status, message) {
+  constructor(status, message, code) {
     super(message);
     this.status = status;
+    this.code = code;
   }
 }

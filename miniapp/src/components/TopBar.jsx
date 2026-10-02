@@ -15,6 +15,7 @@ export function ThemeToggle() {
 }
 
 // Har bir ekranning yuqori paneli. O'ng burchakda doim Dark/Light tugmasi turadi.
+/** @param {{ left?: any, center?: any, title?: any }} props */
 export function TopBar({ left, center, title }) {
   return (
     <header className="topbar">

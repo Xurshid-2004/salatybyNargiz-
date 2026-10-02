@@ -19,6 +19,10 @@ const PATHS = {
   trash: 'M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13',
   star: 'M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9L12 3z',
   target: 'M12 3v3M12 18v3M3 12h3M18 12h3M12 8.5a3.5 3.5 0 100 7 3.5 3.5 0 000-7z',
+  phone: 'M5 4h3.5l1.5 4-2 1.5a11 11 0 006.5 6.5l1.5-2 4 1.5V19a2 2 0 01-2 2A16 16 0 013 6a2 2 0 012-2z',
+  lock: 'M6 11h12v9H6zM8.5 11V8a3.5 3.5 0 017 0v3',
+  copy: 'M9 9h10v11H9zM5 15V4h10',
+  upload: 'M12 16V4M7 9l5-5 5 5M5 20h14',
 };
 
 export function Icon({ name, size = 22, className = '' }) {

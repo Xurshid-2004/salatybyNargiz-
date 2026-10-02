@@ -19,12 +19,34 @@ const stripSlash = (url) => (url || '').trim().replace(/\/+$/, '');
 
 const env = (name) => (process.env[name] || '').trim();
 
-// Mini App manzili. Yozilmagan bo'lsa, hosting bergan ochiq manzil olinadi (Render, Railway).
-const miniappUrl = stripSlash(
-  env('MINIAPP_URL') ||
-    env('RENDER_EXTERNAL_URL') ||
-    (env('RAILWAY_PUBLIC_DOMAIN') ? `https://${env('RAILWAY_PUBLIC_DOMAIN')}` : ''),
+// Hosting bergan ochiq manzil (Render, Railway). Kompyuterda bo'sh.
+const hostingUrl = stripSlash(
+  env('RENDER_EXTERNAL_URL') || (env('RAILWAY_PUBLIC_DOMAIN') ? `https://${env('RAILWAY_PUBLIC_DOMAIN')}` : ''),
 );
+
+// Mini App manzili. Yozilmagan bo'lsa, hosting manzili olinadi.
+const miniappUrl = stripSlash(env('MINIAPP_URL') || hostingUrl);
+
+// Luhn tekshiruvi: karta raqamida xato yozilgan raqam bo'lsa ushlaydi
+function luhnValid(digits) {
+  let sum = 0;
+  for (let i = 0; i < digits.length; i += 1) {
+    let d = Number(digits[digits.length - 1 - i]);
+    if (i % 2 === 1) d = d * 2 > 9 ? d * 2 - 9 : d * 2;
+    sum += d;
+  }
+  return sum % 10 === 0;
+}
+
+// Karta orqali oldindan to'lov (P2P o'tkazma): mijoz shu kartaga o'tkazadi va chek yuklaydi,
+// admin pul tushganini tekshirib tasdiqlaydi. CARD_NUMBER bilan almashtiriladi, CARD_NUMBER=off - o'chadi.
+const cardNumber = (env('CARD_NUMBER') || '9860120124104734').replace(/[\s-]/g, '');
+const card = {
+  number: /^\d{16}$/.test(cardNumber) && luhnValid(cardNumber) ? cardNumber : '',
+  holder: env('CARD_HOLDER'),
+};
+card.enabled = Boolean(card.number);
+card.invalid = !card.enabled && cardNumber.toLowerCase() !== 'off';
 
 const payme = {
   merchantId: env('PAYME_MERCHANT_ID'),
@@ -56,6 +78,10 @@ export const config = {
   adminTelegramIds: list(process.env.ADMIN_TELEGRAM_IDS).filter((id) => /^\d+$/.test(id)),
   miniappUrl,
 
+  // Bot rejimi. Hostingda - webhook: Telegram xabarni serverga o'zi yuboradi va Render bepul tarifida
+  // uxlab qolgan serverni uyg'otadi. Kompyuterda - polling. BOT_WEBHOOK=false - har doim polling.
+  botWebhookBase: env('BOT_WEBHOOK') === 'false' ? '' : hostingUrl,
+
   // Faqat shu manzillardan keladigan brauzer so'rovlariga ruxsat beriladi (CORS).
   corsOrigins: [
     'http://localhost:5173',
@@ -68,6 +94,7 @@ export const config = {
   // Onlayn to'lov tizimlari. Kalitlari .env da yozilgan tizim haqiqiy rejimda ishlaydi.
   payme,
   click,
+  card,
 
   // Sinov rejimi FAQAT aniq PAYMENTS_TEST_MODE=true yozilganda yoqiladi va faqat
   // kalitlari yozilmagan tizimlarga ta'sir qiladi (pul yechilmaydi).

@@ -6,6 +6,8 @@ import { broadcast } from './events.js';
 import { notifyAdmins, notifyCustomer } from '../bot.js';
 
 const INTENT_TTL_MS = 30 * 60 * 1000;
+// Karta orqali to'lovda mijoz pulni o'zi o'tkazib, chek yuklaydi - unga ko'proq vaqt beriladi
+const CARD_INTENT_TTL_MS = 24 * 60 * 60 * 1000;
 
 export const orderInput = z
   .object({
@@ -23,8 +25,7 @@ export const orderInput = z
     latitude: z.number().min(-90).max(90).nullable().optional(),
     longitude: z.number().min(-180).max(180).nullable().optional(),
     branchId: z.string().max(40).optional(),
-    phone: z.string().trim().regex(/^\+?[0-9\s\-()]{7,20}$/, "Telefon raqami noto'g'ri"),
-    paymentMethod: z.enum(['CASH', 'CLICK', 'PAYME']),
+    paymentMethod: z.enum(['CASH', 'CARD', 'CLICK', 'PAYME']),
   })
   .refine((d) => d.deliveryType !== 'DELIVERY' || d.address.length >= 5, {
     message: 'Yetkazib berish manzilini kiriting',
@@ -34,8 +35,9 @@ export const orderInput = z
 /**
  * Mijozdan kelgan ma'lumotni tekshiradi va narxlarni BAZADAN hisoblaydi.
  * Mijoz yuborgan narx/summaga hech qachon ishonilmaydi.
+ * phone - mijozning Telegram orqali tasdiqlangan raqami.
  */
-export async function buildOrderPayload(input) {
+export async function buildOrderPayload(input, phone) {
   const qtyById = new Map();
   for (const it of input.items) {
     qtyById.set(it.productId, (qtyById.get(it.productId) || 0) + it.qty);
@@ -72,7 +74,7 @@ export async function buildOrderPayload(input) {
     latitude: input.deliveryType === 'DELIVERY' ? (input.latitude ?? null) : null,
     longitude: input.deliveryType === 'DELIVERY' ? (input.longitude ?? null) : null,
     branch,
-    phone: input.phone,
+    phone,
     paymentMethod: input.paymentMethod,
   };
 }
@@ -106,7 +108,6 @@ export async function createCashOrder(user, payload) {
     data: orderData(user.id, payload, 'UNPAID'),
     include: { user: true },
   });
-  await prisma.user.update({ where: { id: user.id }, data: { phone: payload.phone } });
   afterOrderCreated(order);
   return order;
 }
@@ -125,7 +126,8 @@ export async function createPaymentIntent(user, payload) {
 
 /** To'lov muddati o'tganmi (shundan keyin yangi to'lov boshlab bo'lmaydi) */
 export function isIntentExpired(intent) {
-  return Date.now() - intent.createdAt.getTime() > INTENT_TTL_MS;
+  const ttl = intent.provider === 'CARD' ? CARD_INTENT_TTL_MS : INTENT_TTL_MS;
+  return Date.now() - intent.createdAt.getTime() > ttl;
 }
 
 /**
@@ -146,7 +148,6 @@ export async function fulfillIntent(tx, intentId) {
     include: { user: true },
   });
   await tx.paymentIntent.update({ where: { id: intentId }, data: { orderId: created.id } });
-  await tx.user.update({ where: { id: intent.userId }, data: { phone: intent.payload.phone } });
   return created;
 }
 

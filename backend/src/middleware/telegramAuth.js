@@ -57,3 +57,13 @@ export const orderLimiter = rateLimit({
   keyGenerator: (req) => `order:${req.user.id}`,
   message: tooMany,
 });
+
+// Telefon raqamni tasdiqlash: daqiqasiga 10 ta
+export const phoneLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 10,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  keyGenerator: (req) => `phone:${req.user.id}`,
+  message: tooMany,
+});

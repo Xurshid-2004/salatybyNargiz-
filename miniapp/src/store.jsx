@@ -151,7 +151,7 @@ export function AppProvider({ children }) {
   const cartTotal = cartItems.reduce((s, i) => s + i.qty * i.price, 0);
 
   const value = {
-    user, products, config, loading, loadError, load,
+    user, setUser, products, config, loading, loadError, load,
     lang, t, changeLang, formatMoney,
     theme, toggleTheme,
     cart, cartItems, cartCount, cartTotal, setQty, clearCart,

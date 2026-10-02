@@ -9,7 +9,7 @@ export const categoryLabel = (v) => CATEGORIES.find((c) => c.value === v)?.label
 export const categoryEmoji = (v) => CATEGORIES.find((c) => c.value === v)?.emoji || '🍽️';
 
 export const DELIVERY = { DELIVERY: 'Yetkazib berish', PICKUP: 'Olib ketish' };
-export const PAYMENT_METHOD = { CASH: 'Naqd', CLICK: 'Click', PAYME: 'Payme' };
+export const PAYMENT_METHOD = { CASH: 'Naqd', CLICK: 'Click', PAYME: 'Payme', CARD: 'Karta' };
 export const PAYMENT_STATUS = { PAID: "To'langan", UNPAID: "To'lanmagan", REFUNDED: 'Qaytarilgan' };
 export const ORDER_STATUS = { PENDING: 'Kutilmoqda', DELIVERED: 'Yetkazildi', CANCELLED: 'Bekor qilingan' };
 

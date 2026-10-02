@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from './api';
+import { compressImage, MAX_IMAGE_BYTES } from './image';
 import { CATEGORIES, categoryEmoji, categoryLabel, money } from './labels';
 
 const EMPTY = { name: '', description: '', price: '', imageUrl: '', category: 'SALADS', isActive: true };
@@ -23,23 +24,37 @@ function ProductForm({ initial, onClose, onSaved, notify }) {
     initial ? { ...initial, price: String(initial.price) } : EMPTY,
   );
   const [busy, setBusy] = useState(false);
-  const [uploading, setUploading] = useState(false);
+  const [preparing, setPreparing] = useState(false);
+  // Tanlangan, lekin hali yuborilmagan rasm: { blob, preview }. "Saqlash" bosilganda bazaga yoziladi.
+  const [image, setImage] = useState(null);
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+
+  useEffect(() => () => image && URL.revokeObjectURL(image.preview), [image]);
 
   const onFile = async (e) => {
     const file = e.target.files?.[0];
+    e.target.value = '';
     if (!file) return;
-    setUploading(true);
+    setPreparing(true);
     try {
-      const { url } = await api.upload(file);
-      set('imageUrl', url);
+      const blob = await compressImage(file);
+      if (blob.size > MAX_IMAGE_BYTES) throw new Error('Rasm hajmi 2 MB dan oshmasin');
+      setImage({ blob, preview: URL.createObjectURL(blob) });
     } catch (err) {
       notify(err.message, true);
     } finally {
-      setUploading(false);
-      e.target.value = '';
+      setPreparing(false);
     }
   };
+
+  const removeImage = () => {
+    setImage(null);
+    set('imageUrl', '');
+  };
+
+  // Bazadagi rasm manzili (/api/images/...) maydonda ko'rsatilmaydi, faqat tashqi havolalar
+  const isStored = form.imageUrl.startsWith('/api/images/');
+  const hasImage = Boolean(image || form.imageUrl);
 
   const submit = async (e) => {
     e.preventDefault();
@@ -55,8 +70,16 @@ function ProductForm({ initial, onClose, onSaved, notify }) {
         category: form.category,
         isActive: form.isActive,
       };
-      if (initial) await api.updateProduct(initial.id, body);
-      else await api.createProduct(body);
+      const saved = initial ? await api.updateProduct(initial.id, body) : await api.createProduct(body);
+      if (image) {
+        try {
+          await api.uploadProductImage(saved.id, image.blob);
+        } catch (err) {
+          notify(`Mahsulot saqlandi, lekin rasm yuklanmadi: ${err.message}`, true);
+          onSaved();
+          return;
+        }
+      }
       notify(initial ? 'Mahsulot yangilandi' : "Mahsulot qo'shildi");
       onSaved();
     } catch (err) {
@@ -97,16 +120,24 @@ function ProductForm({ initial, onClose, onSaved, notify }) {
         <div className="field">
           <span>Rasm</span>
           <div className="image-row">
-            <Thumb product={form} size={64} />
+            <Thumb product={{ ...form, imageUrl: image?.preview || form.imageUrl }} size={64} />
             <div className="image-inputs">
-              <label className="btn small ghost file">
-                {uploading ? 'Yuklanmoqda...' : 'Rasm yuklash'}
-                <input type="file" accept="image/jpeg,image/png,image/webp" hidden onChange={onFile} />
-              </label>
+              <div className="image-actions">
+                <label className="btn small ghost file">
+                  {preparing ? 'Tayyorlanmoqda...' : hasImage ? 'Rasmni almashtirish' : 'Rasm yuklash'}
+                  <input type="file" accept="image/jpeg,image/png,image/webp" hidden onChange={onFile} />
+                </label>
+                {hasImage && (
+                  <button type="button" className="btn small danger" onClick={removeImage}>Olib tashlash</button>
+                )}
+              </div>
               <input
                 placeholder="yoki rasm havolasi (https://...)"
-                value={form.imageUrl}
-                onChange={(e) => set('imageUrl', e.target.value)}
+                value={isStored || image ? '' : form.imageUrl}
+                onChange={(e) => {
+                  setImage(null);
+                  set('imageUrl', e.target.value);
+                }}
               />
             </div>
           </div>
@@ -119,7 +150,7 @@ function ProductForm({ initial, onClose, onSaved, notify }) {
 
         <div className="modal-actions">
           <button type="button" className="btn ghost" onClick={onClose}>Bekor qilish</button>
-          <button className="btn primary" disabled={busy || uploading}>Saqlash</button>
+          <button className="btn primary" disabled={busy || preparing}>{busy ? 'Saqlanmoqda...' : 'Saqlash'}</button>
         </div>
       </form>
     </div>

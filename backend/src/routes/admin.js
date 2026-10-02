@@ -4,12 +4,13 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
-import multer from 'multer';
 import { z } from 'zod';
 import { prisma } from '../prisma.js';
 import { config } from '../config.js';
 import { HttpError } from '../lib/format.js';
 import { addClient, broadcast } from '../lib/events.js';
+import { imageUpload, readUploadedImage } from '../lib/images.js';
+import { confirmCardPayment, listPendingCardPayments, rejectCardPayment } from '../lib/cardPayments.js';
 import { adminAuth, checkAdminPassword, signAdminToken } from '../middleware/adminAuth.js';
 import { notifyCustomerStatus } from '../bot.js';
 
@@ -120,7 +121,10 @@ const productInput = z.object({
     .string()
     .trim()
     .max(500)
-    .refine((v) => v === '' || v.startsWith('/uploads/') || /^https?:\/\//i.test(v), "Rasm manzili noto'g'ri")
+    .refine(
+      (v) => v === '' || v.startsWith('/api/images/') || v.startsWith('/uploads/') || /^https?:\/\//i.test(v),
+      "Rasm manzili noto'g'ri",
+    )
     .default(''),
   category: z.enum(['SALADS', 'SAMSA', 'DRINKS', 'COMPOT', 'SAUCES']),
   isActive: z.boolean().default(true),
@@ -133,7 +137,7 @@ router.get('/products', async (req, res) => {
 });
 
 router.post('/products', async (req, res) => {
-  const data = productInput.parse(req.body);
+  const data = /** @type {import('@prisma/client').Prisma.ProductCreateInput} */ (productInput.parse(req.body));
   res.status(201).json(await prisma.product.create({ data }));
 });
 
@@ -142,6 +146,8 @@ router.put('/products/:id', async (req, res) => {
   const data = productInput.parse(req.body);
   const exists = await prisma.product.findUnique({ where: { id } });
   if (!exists) throw new HttpError(404, 'Mahsulot topilmadi');
+  // Rasm o'chirildi yoki havola bilan almashtirildi - bazadagi eski rasm ham o'chadi
+  if (data.imageUrl !== exists.imageUrl) Object.assign(data, { imageData: null, imageMime: null });
   res.json(await prisma.product.update({ where: { id }, data }));
 });
 
@@ -154,21 +160,56 @@ router.delete('/products/:id', async (req, res) => {
 });
 
 // --- Rasm yuklash ---
-const EXT = { 'image/jpeg': '.jpg', 'image/png': '.png', 'image/webp': '.webp' };
+// Rasm diskka emas, bazaga base64 ko'rinishida yoziladi: server qayta ishga tushsa ham o'chmaydi.
+router.post('/products/:id/image', imageUpload, async (req, res) => {
+  const id = idParam(req);
+  const image = readUploadedImage(req.file);
 
-const upload = multer({
-  storage: multer.diskStorage({
-    destination: uploadsDir,
-    filename: (req, file, cb) => cb(null, `${crypto.randomUUID()}${EXT[file.mimetype]}`),
-  }),
-  limits: { fileSize: 3 * 1024 * 1024, files: 1 },
-  fileFilter: (req, file, cb) =>
-    EXT[file.mimetype] ? cb(null, true) : cb(new HttpError(400, 'Faqat JPG, PNG yoki WEBP rasm yuklang')),
+  const exists = await prisma.product.findUnique({ where: { id } });
+  if (!exists) throw new HttpError(404, 'Mahsulot topilmadi');
+
+  const version = crypto.createHash('sha256').update(image.buffer).digest('hex').slice(0, 12);
+  const product = await prisma.product.update({
+    where: { id },
+    data: { imageData: image.data, imageMime: image.mime, imageUrl: `/api/images/products/${id}?v=${version}` },
+  });
+  res.json(product);
 });
 
-router.post('/upload', upload.single('image'), (req, res) => {
-  if (!req.file) throw new HttpError(400, 'Rasm tanlanmadi');
-  res.status(201).json({ url: `/uploads/${req.file.filename}` });
+// --- Karta orqali to'lovlar: admin kartaga pul tushganini tekshirib tasdiqlaydi ---
+const intentParam = (req) => z.string().uuid().parse(req.params.id);
+
+router.get('/card-payments', async (req, res) => {
+  res.json(await listPendingCardPayments());
+});
+
+// Chek rasmi. Admin Panel uni Authorization sarlavhasi bilan so'raydi (manzilda token yo'q).
+router.get('/card-payments/:id/receipt', async (req, res) => {
+  const intent = await prisma.paymentIntent.findFirst({
+    where: { id: intentParam(req), provider: 'CARD' },
+    omit: { receiptData: false },
+  });
+  if (!intent?.receiptData || !intent.receiptMime) throw new HttpError(404, 'Chek topilmadi');
+  res.set({ 'Content-Type': intent.receiptMime, 'Cache-Control': 'private, max-age=3600' });
+  res.send(Buffer.from(intent.receiptData, 'base64'));
+});
+
+const DECISION_ERRORS = {
+  not_found: [404, "To'lov topilmadi"],
+  already_cancelled: [409, "Bu to'lov allaqachon rad etilgan"],
+  already_paid: [409, "Bu to'lov allaqachon tasdiqlangan"],
+};
+
+router.post('/card-payments/:id/confirm', async (req, res) => {
+  const result = await confirmCardPayment(intentParam(req));
+  if (result.status !== 'confirmed' && result.status !== 'already_paid') throw new HttpError(...DECISION_ERRORS[result.status]);
+  res.json(result);
+});
+
+router.post('/card-payments/:id/reject', async (req, res) => {
+  const result = await rejectCardPayment(intentParam(req));
+  if (result.status !== 'rejected' && result.status !== 'already_cancelled') throw new HttpError(...DECISION_ERRORS[result.status]);
+  res.json(result);
 });
 
 export default router;

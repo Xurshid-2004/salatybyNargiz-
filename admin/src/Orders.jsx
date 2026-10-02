@@ -11,7 +11,7 @@ const FILTERS = [
 
 function beep() {
   try {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const ctx = new (window.AudioContext || /** @type {any} */ (window).webkitAudioContext)();
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
     osc.connect(gain);
@@ -177,7 +177,9 @@ export default function Orders({ notify }) {
                           className="btn small ghost"
                           onClick={() =>
                             window.confirm(
-                              o.paymentMethod !== 'CASH' && o.paymentStatus === 'PAID'
+                              o.paymentMethod === 'CARD' && o.paymentStatus === 'PAID'
+                                ? `#${o.id} buyurtma kartaga o'tkazma orqali to'langan. Bekor qilsangiz, pulni mijozga o'zingiz qaytarishingiz kerak. Bekor qilasizmi?`
+                                : o.paymentMethod !== 'CASH' && o.paymentStatus === 'PAID'
                                 ? `#${o.id} buyurtma ${PAYMENT_METHOD[o.paymentMethod]} orqali to'langan. Bekor qilsangiz, pulni ${PAYMENT_METHOD[o.paymentMethod]} kabinetidan mijozga o'zingiz qaytarishingiz kerak. Bekor qilasizmi?`
                                 : `#${o.id} buyurtmani bekor qilasizmi?`,
                             ) && patch(o.id, { status: 'CANCELLED' })

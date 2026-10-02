@@ -66,7 +66,7 @@ export default function Orders() {
           </ul>
           <div className="order-foot">
             <span className={`status ${{ PAID: 'status-delivered', REFUNDED: 'status-cancelled' }[o.paymentStatus] || 'status-pending'}`}>
-              {o.paymentMethod === 'CASH' ? t('pay_cash') : o.paymentMethod === 'CLICK' ? 'Click' : 'Payme'}
+              {{ CASH: t('pay_cash'), CARD: t('card_provider'), CLICK: 'Click', PAYME: 'Payme' }[o.paymentMethod]}
               {' - '}
               {t({ PAID: 'paid', REFUNDED: 'refunded' }[o.paymentStatus] || 'unpaid')}
             </span>

@@ -1,6 +1,6 @@
 import { Icon } from '../icons';
 import { useApp } from '../store';
-import { LANGS, formatNumber } from '../i18n';
+import { LANGS, formatNumber, formatPhone } from '../i18n';
 import { tg } from '../tg';
 
 export function Avatar({ size = 44 }) {
@@ -31,6 +31,7 @@ export default function Drawer({ open, onClose }) {
           <Avatar size={56} />
           <div className="drawer-user">
             <strong>{name}</strong>
+            {user?.phone ? <span className="drawer-phone">{formatPhone(user.phone)}</span> : null}
             <span className="bonus-chip">
               <Icon name="star" size={14} /> {t('bonuses')}: {formatNumber(user?.bonus || 0)}
             </span>
