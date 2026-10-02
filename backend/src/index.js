@@ -36,14 +36,24 @@ app.use(
   }),
 );
 
+// So'rov shu serverning o'z domenidan keldimi (serverda Mini App va Admin Panel shu yerdan beriladi)
+const sameHost = (req, origin) => {
+  try {
+    return new URL(origin).host === req.get('host');
+  } catch {
+    return false;
+  }
+};
+
 // CORS: faqat o'zimizning Mini App va Admin Panel manzillari
 app.use(
   '/api',
-  cors({
-    origin(origin, callback) {
-      if (!origin || config.corsOrigins.includes(origin)) return callback(null, true);
-      callback(new HttpError(403, 'Bu manzildan so‘rov yuborish taqiqlangan (CORS)'));
-    },
+  cors((req, callback) => {
+    const origin = req.get('origin');
+    if (!origin || config.corsOrigins.includes(origin) || sameHost(req, origin)) {
+      return callback(null, { origin: true });
+    }
+    callback(new HttpError(403, 'Bu manzildan so‘rov yuborish taqiqlangan (CORS)'));
   }),
 );
 
