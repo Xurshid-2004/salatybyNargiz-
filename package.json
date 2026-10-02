@@ -1,0 +1,20 @@
+{
+  "name": "salaty-by-nargiz",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Salaty By Nargiz - Telegram Mini App, Admin Panel va Bot",
+  "scripts": {
+    "install:all": "npm install && npm install --prefix backend && npm install --prefix miniapp && npm install --prefix admin",
+    "db:migrate": "npm run db:migrate --prefix backend",
+    "db:seed": "npm run db:seed --prefix backend",
+    "dev": "concurrently -n backend,miniapp,admin -c blue,green,magenta \"npm run dev --prefix backend\" \"npm run dev --prefix miniapp\" \"npm run dev --prefix admin\"",
+    "build": "npm ci --prefix backend && npm ci --include=dev --prefix miniapp && npm ci --include=dev --prefix admin && npm run build --prefix miniapp && npm run build --prefix admin",
+    "start": "npm start --prefix backend"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

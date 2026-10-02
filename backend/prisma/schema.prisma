@@ -1,0 +1,155 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Category {
+  SALADS
+  SAMSA
+  DRINKS
+  COMPOT
+  SAUCES
+}
+
+enum DeliveryType {
+  DELIVERY
+  PICKUP
+}
+
+enum PaymentMethod {
+  CASH
+  CLICK
+  PAYME
+}
+
+enum PaymentStatus {
+  UNPAID
+  PAID
+  REFUNDED
+}
+
+enum OrderStatus {
+  PENDING
+  DELIVERED
+  CANCELLED
+}
+
+enum IntentStatus {
+  PENDING
+  PAID
+  CANCELLED
+}
+
+enum ClickStatus {
+  PREPARED
+  COMPLETED
+  CANCELLED
+}
+
+model User {
+  id         Int             @id @default(autoincrement())
+  telegramId BigInt          @unique
+  firstName  String
+  lastName   String?
+  username   String?
+  phone      String?
+  language   String          @default("ru")
+  bonus      Int             @default(0)
+  addresses  Json            @default("[]")
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
+  orders     Order[]
+  intents    PaymentIntent[]
+}
+
+model Product {
+  id          Int      @id @default(autoincrement())
+  name        String
+  description String   @default("")
+  price       Int
+  imageUrl    String   @default("")
+  category    Category
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([category])
+}
+
+model Order {
+  id            Int           @id @default(autoincrement())
+  userId        Int
+  user          User          @relation(fields: [userId], references: [id])
+  items         Json
+  total         Int
+  deliveryType  DeliveryType
+  address       String        @default("")
+  latitude      Float?
+  longitude     Float?
+  branch        String?
+  phone         String
+  paymentMethod PaymentMethod
+  paymentStatus PaymentStatus @default(UNPAID)
+  status        OrderStatus   @default(PENDING)
+  createdAt     DateTime      @default(now())
+
+  @@index([userId])
+  @@index([status, createdAt])
+}
+
+// Onlayn to'lov (Click / Payme) tasdiqlanguncha buyurtma shu yerda kutib turadi.
+// To'lov tasdiqlangandan keyingina Order jadvaliga yoziladi.
+model PaymentIntent {
+  id        String        @id @default(uuid())
+  userId    Int
+  user      User          @relation(fields: [userId], references: [id])
+  payload   Json
+  amount    Int
+  provider  PaymentMethod
+  status    IntentStatus  @default(PENDING)
+  orderId   Int?
+  createdAt DateTime      @default(now())
+
+  paymeTransactions PaymeTransaction[]
+  clickTransactions ClickTransaction[]
+
+  @@index([userId])
+}
+
+// Payme (Merchant API) tranzaksiyalari. Ularni Payme serveri boshqaradi.
+// state: 1 - yaratildi, 2 - to'landi, -1 - to'lanmasdan bekor qilindi, -2 - to'langandan keyin bekor qilindi
+model PaymeTransaction {
+  id          Int           @id @default(autoincrement())
+  paymeId     String        @unique
+  intentId    String
+  intent      PaymentIntent @relation(fields: [intentId], references: [id])
+  amount      Int // so'mda (Payme'ga tiyinda yuboriladi: x100)
+  state       Int
+  reason      Int?
+  paymeTime   DateTime // tranzaksiya Payme tomonida yaratilgan vaqt
+  createTime  DateTime      @default(now())
+  performTime DateTime?
+  cancelTime  DateTime?
+
+  @@index([intentId])
+  @@index([paymeTime])
+}
+
+// Click (SHOP API) tranzaksiyalari: Prepare -> Complete
+model ClickTransaction {
+  id            Int           @id @default(autoincrement())
+  clickTransId  String        @unique
+  clickPaydocId String        @default("")
+  intentId      String
+  intent        PaymentIntent @relation(fields: [intentId], references: [id])
+  amount        Int // so'mda
+  status        ClickStatus   @default(PREPARED)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@index([intentId])
+}
