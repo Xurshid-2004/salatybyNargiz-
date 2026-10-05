@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Icon } from '../icons';
 import { useApp } from '../store';
 import { CATEGORIES, CATEGORY_EMOJI } from '../i18n';
-import { TopBar } from '../components/TopBar';
+import { AdminButton, TopBar } from '../components/TopBar';
 import ProductCard from '../components/ProductCard';
 import Drawer from '../components/Drawer';
 import AddressSheet from '../components/AddressSheet';
@@ -51,6 +51,7 @@ export default function Home() {
             <Icon name="chevron" size={16} />
           </button>
         }
+        right={<AdminButton />}
       />
 
       <label className="searchbar">

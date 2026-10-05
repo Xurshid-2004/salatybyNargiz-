@@ -124,6 +124,7 @@ p {
 }
 .topbar-right {
   justify-content: flex-end;
+  gap: 8px;
 }
 .topbar-center {
   min-width: 0;
@@ -149,6 +150,31 @@ p {
   color: var(--danger);
   background: transparent;
   border-color: transparent;
+}
+.admin-btn {
+  height: 42px;
+  padding: 0 12px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 700;
+  font-size: 14px;
+  flex: none;
+}
+.admin-btn:active {
+  opacity: 0.85;
+}
+/* Tor telefonlarda manzil tugmasiga joy qolishi uchun faqat "Admin" yozuvi */
+@media (max-width: 380px) {
+  .admin-btn {
+    padding: 0 10px;
+  }
+  .admin-btn svg {
+    display: none;
+  }
 }
 
 /* ---------- Tugmalar ---------- */
@@ -326,6 +352,9 @@ p {
 .addr-text small {
   font-size: 11px;
   color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .addr-text strong {
   font-size: 13.5px;
