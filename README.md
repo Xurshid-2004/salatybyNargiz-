@@ -18,7 +18,7 @@ Kerak: Node.js 20 yoki yangiroq (https://nodejs.org). Terminalni shu papkada och
 ```bash
 npm run install:all     # 1. barcha paketlarni o'rnatish
 npm run db:migrate      # 2. bazada jadvallarni yaratish / yangilash (ma'lumotlar o'chmaydi)
-npm run db:seed         # 3. boshlang'ich mahsulotlarni yozish
+npm run db:seed         # 3. menyuni (narx va rasmlari bilan) yozish, qayta ishga tushirsa bo'ladi
 npm run dev             # 4. hammasini ishga tushirish
 ```
 
